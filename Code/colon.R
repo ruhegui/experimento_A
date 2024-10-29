@@ -84,15 +84,14 @@ setwd("/home/guille/RNA/RNA_2024/EXPA/experimento_A")
 
 logcpm = cpm(y, log=TRUE)
 rownames(logcpm) = y$genes$symbol #Nombre de genes
-colnames(logcpm) =  paste(y$samples$group, 1:9, sep = "-")
+colnames(logcpm) =  paste(y$samples$group, y$samples$names, sep = "-")
 
-DEG = res_corrected$table[res_corrected$table$PValue < 0.05 & abs(res_corrected$table$logFC) > 1 , ]
+DEG = res_corrected$table[res_corrected$table$PValue < 0.01 & abs(res_corrected$table$logFC) > 0 , ]
 DEG_selection = logcpm[na.omit(DEG$symbol),]
 q =  as.ggplot(pheatmap(DEG_selection, scale = "row", 
                         clustering_method = "complete",
                         display_numbers = F,
-                        border_color = NA, cluster_cols = T,
-                        main = "TNAP KNOCKOUT VS WT",
+                        border_color = NA, cluster_cols = T, cutree_cols = 2, cutree_rows = 2, show_rownames = T,
                         #annotation_col = annotation, show_rownames = F, annotation_names_col = F,
                         #annotation_row = setNames(data.frame(Cluster = as.factor(cutree(q$tree_row, k=2))), "Cluster"), 
                         annotation_names_row = F,
@@ -100,9 +99,7 @@ q =  as.ggplot(pheatmap(DEG_selection, scale = "row",
 ggsave(filename="Results/exp_A_colon/heatmap.png", dpi = "print", bg = "white", scale = 1.80)
 
 options(enrichplot.colours = c("#FF3030CC", "#1E90FFCC"))
-foldchanges = res$table$logFC
-names(foldchanges) = res$genes$symbol
-foldchanges = sort(foldchanges, decreasing = TRUE)
+
 original_gene_list <- res_corrected$table$logFC
 names(original_gene_list) <- res_corrected$table$symbol
 gene_list<-na.omit(original_gene_list)

@@ -20,28 +20,20 @@ suppressPackageStartupMessages(library(SummarizedExperiment))
 se = tximeta(files)                   
 se <- addExons(se)
 gse <- summarizeToGene(se, assignRanges="abundant") #Asigna rangos según la isoforma más abundante de los transcritos en vez de desde la isoforma más en 5' a la isoforma más en 3'. Los creadores lo recomiendan.
-gse <- addIds(gse, "GENENAME", gene=TRUE)
-gse <- addIds(gse, "SYMBOL", gene=TRUE)
-gse <- addIds(gse, "ENTREZID", gene = TRUE)
 y <- makeDGEList(gse)
 rm(se)
-sampleinfo <- read.delim(file ="Metadata/sampleinfo.txt", sep = "\t", header = T)
+sampleinfo <- read.delim(file ="Metadata/sampleinfo_yeyuno.txt", sep = "\t", header = T)
 sampleinfo[,2]
 group = sampleinfo[,2]
 #group = paste(sampleinfo$Genotipe, sampleinfo$Batch, sep = "_")
 group = factor(group)
 group = relevel(group, ref = "WT")
 y$samples$group = group
-y$samples$batch = sampleinfo$Batch
-y$samples
-y$samples
+y$samples$batch = factor(sampleinfo$Batch)
 
-design = model.matrix(~0 + group)
-colnames(design) = levels(group)
-print(design)
 keep <- filterByExpr(y)
 print(summary(keep))
-y1 <- y[keep, ]
+y <- y[keep, ]
 points <- c(1:2) # Formas
 colors <- c(1:2) #Colores
 mds = plotMDS(y, col=colors[group], pch=points[group], labels=y$samples$names)
@@ -64,7 +56,7 @@ mds_data %>% ggplot(aes(x = Dim1, y = Dim2, col = Group, shape = Group)) +
                   alpha = 0.2) + 
   theme(plot.title = element_text(hjust = 0.5))
 ########
-logCPMs <- cpm(y[,c(1:6,8:10,12:17)], log = TRUE)
+logCPMs <- cpm(y, log = TRUE)
 
 # Calculate rowwise variance
 rv <- apply(logCPMs, 1, var)
@@ -80,7 +72,7 @@ logCPM_top1000 <- logCPMs[top1000,]
 pca <- prcomp(t(logCPM_top1000))
 
 # Combine PCA coordinates with the metadata from the DGEList
-to_plot <- data.frame(pca$x, y[,c(1:6,8:10,12:17)]$samples)
+to_plot <- data.frame(pca$x, y$samples)
 
 # Calculate how many % of total variance is explained by each principal component
 percentVar <- pca$sdev^2 / sum( pca$sdev^2 )*100
@@ -94,7 +86,7 @@ ggplot(to_plot, aes(x=PC1, y=PC2, color=batch, shape=group)) +
   xlab(labs[1]) + ylab(labs[2])
 
 # correct for the batch which here is the "kit"
-batch <- factor(y[,c(1:6,8:10,12:17)]$samples$batch)
+batch <- factor(y$samples$batch)
 
 logCPMs_corrected <- limma::removeBatchEffect(logCPMs, batch = batch)
 
@@ -105,7 +97,7 @@ logCPM_corrected_top1000 <- logCPMs_corrected[top1000,]
 pca <- prcomp(t(logCPM_corrected_top1000))
 
 # Combine PCA coordinates with the metadata from the DGEList
-to_plot <- data.frame(pca$x, y[,c(1:6,8:10,12:17)]$samples)
+to_plot <- data.frame(pca$x, y$samples)
 
 # Calculate how many % of total variance is explained by each principal component
 percentVar <- pca$sdev^2 / sum( pca$sdev^2 )*100
@@ -119,27 +111,27 @@ ggplot(to_plot, aes(x=PC1, y=PC2, color=batch, shape=group)) +
   xlab(labs[1]) + ylab(labs[2])
 
 # Design accounting for kit (=batch)
-design2 <- model.matrix(~batch+group, y$samples)
+design <- model.matrix(~batch+group, y$samples)
 group
-print(design2)
+
 print(design)
 
 
 # QLF workflow from edgeR
-y2 <- estimateDisp(y, design2, robust = TRUE)
+y <- estimateDisp(y, design, robust = TRUE)
 plotBCV(y)
-fit2 <- glmQLFit(y2, design2, robust = TRUE)
+fit <- glmQLFit(y, design, robust = TRUE)
 plotQLDisp(fit)
 
 design
 # see head(design) => the fourth column is treatment which is what we want to test
-qlf  <- glmQLFTest(fit2, coef=3)
+qlf  <- glmQLFTest(fit, coef=3)
 topTags(qlf)
 
 
 qlf
 # get stats as a data.frame
-tt <- data.frame(topTags(res, n=Inf))
+tt <- data.frame(topTags(qlf, n=Inf))
 
 # Classify genes into significantly up and down
 tt_modified <- tt %>% 
@@ -163,38 +155,27 @@ ggplot(tt_modified, aes(x=logFC, y=-log10(PValue), color=status)) +
 head(tt)
 
 ########
-y1 <- estimateDisp(y1, design, method = "ROBUST")
-plotBCV(y)
-fit <- glmQLFit(y1, design, method = "ROBUST")
-plotQLDisp(fit)
+
 logcpm = cpm(y, log=TRUE)
-rownames(logcpm) = y$genes$SYMBOL #Nombre de genes
+rownames(logcpm) = y$genes$symbol #Nombre de genes
 colnames(logcpm) =  paste(y$samples$group, y$samples$names, sep = "-")
 
-design = model.matrix(~0 + group)
-colnames(design) = levels(group)
-print(design)
 
-contrast = makeContrasts(
-  "KO - WT",
-  levels=design)
 
-contrast[,1]
-res <- glmQLFTest(fit, contrast = contrast[,1])
-res_corrected = topTags(res, n = Inf)
-res$comparison
-head(res_corrected, 1)
-head(tt,1)
-tt
-is.de = decideTests(qlf, adjust.method = "BH", p.value = 0.05, lfc = 1)
-plotMD(res, status = is.de)
 data = tt
 data$DE <- "NO"
-data$DE[data$logFC > 1 & data$PValue < 0.05] <- "UP"
-data$DE[data$logFC < -1 & data$PValue < 0.05] <- "DOWN"
-ggplot(data = data, aes(x=logFC, y =-log10(PValue), col=DE, label = ifelse(abs(logFC) >= 2 & PValue <0.05, as.character(SYMBOL),  ''))) + geom_point() +
+data$DE[data$logFC > 0 & data$PValue <= 0.05] <- "UP"
+data$DE[data$logFC < 0 & data$PValue <= 0.05] <- "DOWN"
+ggplot(data = data, aes(x=logFC, y =-log10(PValue), col=DE, label = ifelse(abs(logFC) >= 2 & PValue <0.05, as.character(symbol),  ''))) + geom_point() +
   geom_text_repel(hjust = 0, nudge_x = 0.1, color = "black") +
   theme_minimal() +
-  geom_hline(yintercept=-log10(0.05)) +
-  geom_vline(xintercept=1) +
-  geom_vline(xintercept=-1)
+  geom_hline(yintercept=-log10(0.05))
+setwd("/home/guille/RNA/RNA_2024/EXPA/experimento_A/Results/")
+experimento = "exp_A_yeyuno"
+dir.create(experimento, showWarnings = FALSE)
+if (!file.exists(paste0(experimento, "/",experimento, ".xlsx"))) {
+  write.xlsx2(x = tt[!is.na(tt$table$gene_name) & tt$PValue <= 0.05 ,c(1,7,13,16,17)], file = paste0(experimento, "/",experimento, ".xlsx"), col.names = T, row.names = F, append = TRUE, )
+} else {
+  print("Ya existe")
+}
+

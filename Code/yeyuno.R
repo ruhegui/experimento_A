@@ -2,7 +2,7 @@
 if (!require("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 #Paquetes
-list.of.packages = c("tximeta", "tximport", "limma", "edgeR", "tidyverse", "org.Mm.eg.db", "statmod", "pheatmap", "ggplotify", "ggrepel", "SummarizedExperiment", "patchwork", "xlsx", "ragg", "OmnipathR")
+list.of.packages = c("tximeta", "tximport", "limma", "edgeR", "tidyverse", "org.Mm.eg.db", "statmod", "pheatmap", "ggplotify", "ggrepel", "SummarizedExperiment", "patchwork", "xlsx", "ragg", "OmnipathR", "clusterProfiler")
 #Instalación por CRAN o Bioconductor
 new.packages = list.of.packages[!(list.of.packages %in% installed.packages())]
 if(length(new.packages)> 0) {
@@ -174,8 +174,56 @@ setwd("/home/guille/RNA/RNA_2024/EXPA/experimento_A/Results/")
 experimento = "exp_A_yeyuno"
 dir.create(experimento, showWarnings = FALSE)
 if (!file.exists(paste0(experimento, "/",experimento, ".xlsx"))) {
-  write.xlsx2(x = tt[!is.na(tt$table$gene_name) & tt$PValue <= 0.05 ,c(1,7,13,16,17)], file = paste0(experimento, "/",experimento, ".xlsx"), col.names = T, row.names = F, append = TRUE, )
+  write.xlsx2(x = tt[!is.na(tt$gene_name) & tt$PValue <= 0.05 ,c(1,7,13,16,17)], file = paste0(experimento, "/",experimento, ".xlsx"), col.names = T, row.names = F, append = TRUE, )
 } else {
   print("Ya existe")
 }
 
+logcpm = cpm(y, log=TRUE)
+rownames(logcpm) = y$genes$symbol #Nombre de genes
+colnames(logcpm) =  paste(y$samples$group, y$samples$names, sep = "-")
+
+DEG = tt[tt$PValue < 0.001 & abs(tt$logFC) > 0 , ]
+DEG_selection = logcpm[na.omit(DEG$symbol),]
+q =  as.ggplot(pheatmap(DEG_selection, scale = "row", 
+                        clustering_method = "complete",
+                        display_numbers = F,
+                        border_color = NA, cluster_cols = T, cutree_cols = 4, cutree_rows = 2, show_rownames = T,
+                        #annotation_col = annotation, show_rownames = F, annotation_names_col = F,
+                        #annotation_row = setNames(data.frame(Cluster = as.factor(cutree(q$tree_row, k=2))), "Cluster"), 
+                        annotation_names_row = F,
+                        legend_labels = F,))
+options(enrichplot.colours = c("#FF3030CC", "#1E90FFCC"))
+original_gene_list <- tt$logFC
+names(original_gene_list) <- tt$symbol
+gene_list<-na.omit(original_gene_list)
+gene_list = sort(gene_list, decreasing = TRUE)
+gse <- gseGO(geneList=na.omit(gene_list[!duplicated(names(gene_list))]), 
+             ont ="BP", 
+             keyType = "SYMBOL",
+             nPermSimple = 1000,
+             minGSSize = 3, 
+             maxGSSize = 800, 
+             pvalueCutoff = 0.05, 
+             verbose = TRUE, 
+             OrgDb = org.Mm.eg.db, 
+             pAdjustMethod = "BH", eps = 0)
+dotplot(gse,title = "Biological Process", split=".sign", ) + facet_grid(.~.sign)
+cnetplot(gse, categorySize="pvalue", foldChange=gene_list, showCategory = 10)
+ridgeplot(gse, showCategory = 15) + labs(x = "Enrichment Distribution", title = "Biological Process") + theme(plot.title = element_text(hjust = 0.5)) 
+
+kegg_gene_list <- tt$logFC
+names(kegg_gene_list) <- tt$entrezid
+kegg_gene_list<-na.omit(kegg_gene_list)
+kegg_gene_list = sort(kegg_gene_list, decreasing = TRUE)
+kegg_organism = "mmu"
+kk <- gseKEGG(geneList     = kegg_gene_list[!duplicated(names(kegg_gene_list))],
+               organism     = kegg_organism,
+               pvalueCutoff = 0.05,
+               pAdjustMethod = "BH",
+               keyType       = "ncbi-geneid", eps = 0)
+kk2 = setReadable(kk, org.Mm.eg.db, keyType = "ENTREZID")
+
+dotplot(kk2,  title = "Enriched Pathways" , split=".sign") + facet_grid(.~.sign)
+cnetplot(kk2, categorySize="pvalue", foldChange=gene_list)
+ridgeplot(kk2, showCategory = 15) + labs(x = "Enrichment Distribution", title = "KEGG Pathways") + theme(plot.title = element_text(hjust = 0.5))

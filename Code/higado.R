@@ -14,7 +14,6 @@ if(length(new.packages)> 0) {
 }
 invisible(lapply(list.of.packages, FUN=library, character.only=TRUE))
 rm(list.of.packages, new.packages)
-setwd("/home/guille/RNA/RNA_2024/EXPA/experimento_A")
 files = data.frame(read.table(file="Metadata/metadata.txt", header = TRUE, stringsAsFactors = F))[c(36:53),]
 suppressPackageStartupMessages(library(SummarizedExperiment))
 se = tximeta(files)                   
@@ -94,7 +93,9 @@ plotQLDisp(fit)
 contrast = makeContrasts(
   "KO - WT",
   levels=design)
+fit
 res <- glmQLFTest(fit, contrast = contrast)
+res$comparison
 res_corrected = topTags(res, n = Inf)
 head(res_corrected)
 data = res_corrected$table

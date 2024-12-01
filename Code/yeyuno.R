@@ -133,10 +133,11 @@ qlf
 # get stats as a data.frame
 tt <- data.frame(topTags(qlf, n=Inf))
 
+
 # Classify genes into significantly up and down
 tt_modified <- tt %>% 
-  mutate(status=factor(case_when(logFC>0 & PValue<0.05 ~ "up",
-                                 logFC<0 & PValue<0.05 ~ "down",
+  mutate(status=factor(case_when(logFC>0 & FDR<0.05 ~ "up",
+                                 logFC<0 & FDR<0.05 ~ "down",
                                  TRUE ~ "not.signif"),
                        levels=c("up", "not.signif", "down")))
 

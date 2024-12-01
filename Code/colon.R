@@ -13,9 +13,7 @@ if(length(new.packages)> 0) {
 }
 invisible(lapply(list.of.packages, FUN=library, character.only=TRUE))
 rm(list.of.packages, new.packages)
-setwd("/home/guille/RNA/RNA_2024/EXPA/experimento_A")
 files = data.frame(read.table(file="Metadata/metadata.txt", header = TRUE, stringsAsFactors = F))[c(18:35),]
-suppressPackageStartupMessages(library(SummarizedExperiment))
 se = tximeta(files)                   
 se <- addExons(se)
 gse <- summarizeToGene(se, assignRanges="abundant") #Asigna rangos según la isoforma más abundante de los transcritos en vez de desde la isoforma más en 5' a la isoforma más en 3'. Los creadores lo recomiendan.
@@ -75,7 +73,7 @@ setwd("/home/guille/RNA/RNA_2024/EXPA/experimento_A/Results/")
 experimento = "exp_A_colon"
 dir.create(experimento, showWarnings = FALSE)
 if (!file.exists(paste0(experimento, "/",experimento, ".xlsx"))) {
-  write.xlsx2(x = res_corrected[!is.na(res_corrected$table$gene_name) & res_corrected$table$PValue <= 0.05 ,c(1,7,13,16,17)], file = paste0(experimento, "/",experimento, ".xlsx"), col.names = T, row.names = F, append = TRUE, )
+  write.xlsx2(x = res_corrected[!is.na(res_corrected$table$gene_name) & res_corrected$table$PValue <= 0.05 ,c(1,7,13,16,17)], file = paste0(experimento, "/",experimento, ".xlsx"), col.names = T, row.names = F, append = TRUE)
 } else {
   print("Ya existe")
 }
@@ -88,6 +86,8 @@ colnames(logcpm) =  paste(y$samples$group, y$samples$names, sep = "-")
 
 DEG = res_corrected$table[res_corrected$table$PValue < 0.01 & abs(res_corrected$table$logFC) > 0 , ]
 DEG_selection = logcpm[na.omit(DEG$symbol),]
+
+
 q =  as.ggplot(pheatmap(DEG_selection, scale = "row", 
                         clustering_method = "complete",
                         display_numbers = F,
